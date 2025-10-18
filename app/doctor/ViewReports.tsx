@@ -1122,7 +1122,7 @@ export default function ViewReports() {
           </View>
           <View style={styles.reportDetail}>
             <Text style={styles.detailLabel}>Date:</Text>
-            <Text style={styles.detailValue}>{formatDate(item.inr_report.date)}</Text>
+            <Text style={styles.detailValue}>{item.inr_report.date}</Text>
           </View>
           {item.inr_report.instructions && (
             <View style={styles.reportDetail}>

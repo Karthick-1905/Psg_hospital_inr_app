@@ -21,7 +21,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, onViewPatient,doctor
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [showCaretakerModal, setShowCaretakerModal] = useState(false);
-
+  console.log(patient)
   return (
     <View style={styles.card}>
       <Text style={styles.name}>{patient.name}</Text>

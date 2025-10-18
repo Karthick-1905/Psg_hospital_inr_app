@@ -80,20 +80,6 @@ const PatientTable: React.FC<PatientTableProps> = ({ patients, onViewPatient }) 
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <Text style={styles.searchLabel}>Search:</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchTerm}
-            onChangeText={(text) => {
-              setSearchTerm(text);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by name or OP#..."
-          />
-        </View>
-      </View>
       
       <ScrollView horizontal={true} contentContainerStyle={{flexGrow : 1}}>
         <ScrollView contentContainerStyle={{flexGrow:1}}>

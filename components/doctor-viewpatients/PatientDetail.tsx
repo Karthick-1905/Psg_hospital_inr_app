@@ -1,4 +1,3 @@
-
 import React, { useState,useEffect } from 'react';
 import { 
   View, 
@@ -11,7 +10,7 @@ import {
   SafeAreaView,
   Dimensions,
   Modal,
-  Platform
+  Platform, ActivityIndicator
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +21,7 @@ import { Patient } from '@/types/doctor';
 import { useDoctorContext } from '@/hooks/context/DoctorContext';
 import { showToast } from '../ui/CustomToast';
 import Toast from 'react-native-toast-message';
+import { format } from 'date-fns';
 
 interface PatientDetailProps {
   patient: Patient;
@@ -32,6 +32,11 @@ interface DosageItem {
   day: string;
   dosage: number;
   enabled: boolean;
+}
+
+interface InstructionEntry {
+  instruction: string;
+  createdAt?: string;
 }
 
 const convertPrescriptionObjectToArray = (prescriptionArray: DosageScheduleItem[]): { day: string; dosage: number }[] => {
@@ -47,6 +52,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
   const [editMode, setEditMode] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [nextReviewDate, setNextReviewDate] = useState<string>('');
+  const [instructionList, setInstructionList] = useState<InstructionEntry[]>([]);
+  const [instructionModalVisible, setInstructionModalVisible] = useState(false);
+  const [instructionDraft, setInstructionDraft] = useState('');
+  const queryClient = useQueryClient();
+  
   type Day =
   | 'MON'
   | 'TUE'
@@ -58,13 +68,13 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
  
   const queryclient = useQueryClient()
 
-  const {data:PatientData = null,isLoading,isError} = useQuery({
-    queryKey:['patient', patient.ID],
-    queryFn:async() => {
-      const response = await apiClient.get<PatientDashboardResponse>(`/doctor/view-patient/${patient.ID}`)
+   const { data: PatientData = null, isLoading, isError } = useQuery({
+    queryKey: ['patient', patient.ID],
+    queryFn: async () => {
+      const response = await apiClient.get<PatientDashboardResponse>(`/doctor/view-patient/${patient.ID}`);
       return response.data;
-    },
-  })
+    }
+  });
 
   const {doctorData} = useDoctorContext();
 
@@ -85,7 +95,34 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
     if (PatientData?.patient?.next_review_date) {
       setNextReviewDate(PatientData.patient.next_review_date);
     }
-  }, [PatientData]);
+    const instructionsFromApi = PatientData?.patient?.instructions;
+    if (Array.isArray(instructionsFromApi)) {
+      const sortedInstructions = [...instructionsFromApi]
+        .map(item => ({
+          instruction: item.instruction,
+          createdAt: item.createdAt ?? item.created_at,
+        }))
+        .sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+      setInstructionList(sortedInstructions);
+      if (!instructionModalVisible) {
+        setInstructionDraft(sortedInstructions[0]?.instruction ?? '');
+      }
+    } else if (typeof instructionsFromApi === 'string' && instructionsFromApi.trim()) {
+      setInstructionList([{ instruction: instructionsFromApi }]);
+      if (!instructionModalVisible) {
+        setInstructionDraft(instructionsFromApi);
+      }
+    } else {
+      setInstructionList([]);
+      if (!instructionModalVisible) {
+        setInstructionDraft('');
+      }
+    }
+  }, [PatientData, instructionModalVisible]);
 
   const toggleDay = (day: string, enabled: boolean) => {
     setDosage(prev =>
@@ -146,6 +183,41 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
      }
   })
 
+  const latestInstruction = instructionList[0]?.instruction ?? '';
+
+  const { mutate: submitInstruction, isPending: instructionSubmitting } = useMutation({
+    mutationFn: async (instructionText: string) => {
+      const payload = { instruction: instructionText.trim() };
+      const targetId = patient.ID;
+      const response = await apiClient.post(`/doctor/add-instruction/${targetId}`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient', patient.ID] });
+      setInstructionModalVisible(false);
+      Toast.show({
+        type: 'success',
+        text1: 'Instructions updated successfully',
+      });
+    },
+    onError: () => {
+      Toast.show({
+        type: 'error',
+        text1: 'Unable to update instructions right now',
+      });
+    },
+  });
+
+  const handleOpenInstructionModal = () => {
+    setInstructionDraft(latestInstruction);
+    setInstructionModalVisible(true);
+  };
+
+  const handleSubmitInstruction = () => {
+    if (!instructionDraft.trim()) return;
+    submitInstruction(instructionDraft.trim());
+  };
+
   const handleEditDosage = () => {
     if (editMode) {
       changeDosage(dosage)
@@ -176,6 +248,8 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
   for (let i = 0; i < missed.length; i += 5) {
     missedPages.push(missed.slice(i, i + 5));
   }
+
+  console.log(PatientData)
 
 
   const renderTabContent = () => {
@@ -369,11 +443,83 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patient, onBack }) => {
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={{color: '#2196F3', textDecorationLine: 'underline'}}>
-                  {nextReviewDate || 'Set Review Date'}
+                  {nextReviewDate|| 'Set Review Date'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Instructions</Text>
+              <TouchableOpacity 
+                style={styles.infoValue}
+                onPress={handleOpenInstructionModal}
+              >
+                <Text style={{color: '#2196F3', textDecorationLine: 'underline'}}>
+                  {latestInstruction || 'Set Instructions'}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          <Modal
+              transparent
+              visible={instructionModalVisible}
+              animationType="fade"
+              onRequestClose={() => setInstructionModalVisible(false)}
+            >
+              <View className="flex-1 items-center justify-center bg-black/50 px-6">
+                <View className="w-full rounded-2xl bg-white p-5">
+                  <Text className="mb-3 text-lg font-semibold text-gray-900">Update Instructions</Text>
+                  <TextInput
+                    className="h-32 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-base text-gray-900"
+                    multiline
+                    value={instructionDraft}
+                    onChangeText={setInstructionDraft}
+                    placeholder="Type new instructions here..."
+                    placeholderTextColor="#9ca3af"
+                    textAlignVertical="top"
+                  />
+                  <View className="mt-4">
+                    <Text className="mb-2 text-sm font-semibold text-gray-700">Previous Instructions</Text>
+                    {instructionList.length ? (
+                      <ScrollView className="max-h-48">
+                        {instructionList.map((entry, index) => (
+                          <View key={`${entry.createdAt ?? index}-${index}`} className="mb-2 rounded-lg bg-gray-100 p-3">
+                            <Text className="text-sm text-gray-800">{entry.instruction}</Text>
+                            {entry.createdAt && (
+                              <Text className="mt-1 text-xs text-gray-500">
+                                {format(new Date(entry.createdAt), "dd MMM yyyy, HH:mm")}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <Text className="text-sm text-gray-500">No instructions added yet.</Text>
+                    )}
+                  </View>
+                  <View className="mt-4 flex-row justify-end gap-3">
+                    <TouchableOpacity
+                      className="rounded-xl bg-gray-200 px-4 py-2"
+                      onPress={() => setInstructionModalVisible(false)}
+                      disabled={instructionSubmitting}
+                    >
+                      <Text className="text-gray-700">Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      className="rounded-xl bg-blue-500 px-4 py-2"
+                      onPress={handleSubmitInstruction}
+                      disabled={instructionSubmitting}
+                    >
+                      {instructionSubmitting ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text className="text-white">Save</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
           
           {/*<View style={styles.infoTable}>
             <View style={styles.infoRow}>

@@ -46,6 +46,7 @@ declare interface PatientFormData {
 
 export interface Patient {
   ID: string;
+  opnum: string;
   name: string;
   age: number;
   gender: string;

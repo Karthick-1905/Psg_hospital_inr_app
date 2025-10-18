@@ -10,6 +10,7 @@ import { Doctor, Patient } from '@/types/doctor';
 import NotFoundAnimation from '@/components/animations/NotFoundAnimation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/hooks/api';
+import { Ionicons } from '@expo/vector-icons';
 
 type ViewMode = 'cards' | 'table';
 
@@ -51,6 +52,8 @@ const Patients = () => {
   if (selectedPatient) {
     return <PatientDetail patient={selectedPatient} onBack={handleBackToList} />;
   }
+
+  console.log("filteredPatients " + filteredPatients)
   
   return (
     <SafeAreaView style={styles.container}>
@@ -58,8 +61,8 @@ const Patients = () => {
         colors={['#c8b6e2', '#f8c8d8']}
         style={styles.gradientBackground}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Viewing {filteredPatients.length} Patients</Text>
+        <View className='flex flex-row items-center justify-around m-5'>
+          <Text className='flex-1 text-center w-full ml-5 font-bold text-2xl' >Viewing {filteredPatients.length} Patients</Text>
           <TouchableOpacity 
             style={styles.viewModeButton}
             onPress={toggleViewMode}
@@ -70,15 +73,20 @@ const Patients = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            placeholder="Search by name or OP#..."
-            placeholderTextColor="#999"
-          />
+        <View className='mb-5 w-full'>
+          <View className='flex-row items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-sm shadow-black/10'>
+            <TextInput
+              className='flex-1 text-base text-gray-800'
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              placeholder='Search by Name or OP-#...'
+              placeholderTextColor='#9ca3af'
+            />
+            <Ionicons name='search' size={22} color='#4b5563' />
+          </View>
         </View>
+
+        
         
         {viewMode === 'cards' ? (
           <FlatList
@@ -129,10 +137,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -149,7 +153,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   searchContainer: {
-    marginBottom: 16,
+    marginTop: 16,
     paddingHorizontal: 12,
     backgroundColor: 'white',
     borderRadius: 8,

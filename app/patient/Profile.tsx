@@ -6,6 +6,7 @@ import { usePatientContext } from '@/hooks/context/PatientContext'
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/hooks/api';
 import { ReportFormResponse } from '@/types/patient';
+import { format } from 'date-fns';
 
 export const formatDateTime = (isoString: string) => {
   const date = new Date(isoString);
@@ -31,6 +32,7 @@ const screenHeight = Dimensions.get("window").height
 const Profile = () => {
   const { patientData } = usePatientContext();
   const { patient, chart_data, missed_doses } = patientData || { patient: {}, chart_data: [], missed_doses: [] };
+  console.log(patientData)
 
   const tableHead = ['Day', 'Dose'];
   const tableData = patient?.dosage_schedule?.map((item) => [item.day, item.dosage]) || [];
@@ -53,6 +55,21 @@ const Profile = () => {
   const validChartData: Record<string, number> = Array.isArray(chart_data)
   ? {}  // or convert array to object here
   : chart_data;
+
+  const instructionEntries = Array.isArray(patient.instructions)
+    ? [...patient.instructions]
+        .map((item: { instruction: string; createdAt?: string; created_at?: string }) => ({
+          instruction: item.instruction,
+          createdAt: item.createdAt ?? item.created_at ?? null,
+        }))
+        .sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        })
+    : [];
+
+  const latestReviewDate = patient.next_review_date || 'Not Set';
   
   return (
     <ScrollView style={styles.container}>
@@ -67,7 +84,33 @@ const Profile = () => {
           <Text className='text-xl font-bold tracking-wide'>{`${patient.target_inr_min} - ${patient.target_inr_max}`}</Text>
         </View>
 
+        
         <View className='h-[1px] bg-[#555050c9] w-full my-5'/>
+
+        <View className='rounded-2xl flex flex-row items-center justify-between'>
+          <Text className='text-lg text-slate-800 font-primaryBold'>Next Review Date</Text>
+          <Text className='mt-1 text-base font-semibold'>{latestReviewDate}</Text>
+        </View>
+
+        <View className='h-[1px] bg-[#555050c9] w-full my-5'/>
+
+        <View className='mb-4 rounded-2xl w-full'>
+          <Text className='text-lg font-primaryBold text-slate-800 w-full'>Instructions</Text>
+          {instructionEntries.length ? (
+            instructionEntries.map((entry, index) => (
+              <View key={`${entry.createdAt ?? index}-${index}`} className='mt-2 rounded-xl flex flex-row w-full items-center  justify-between'>
+                <Text className='text-lg text-gray-800 font-bold'>{entry.instruction}</Text>
+                {entry.createdAt && (
+                  <Text className='text-base font-semibold'>
+                    {format(new Date(entry.createdAt), 'dd MMM yyyy, HH:mm')}
+                  </Text>
+                )}
+              </View>
+            ))
+          ) : (
+            <Text className='mt-2 text-base text-slate-600'>No instructions available.</Text>
+          )}
+        </View>
 
         <View className='flex items-center gap-3'>
           <View className='flex flex-row items-center justify-center gap-x-3'>
@@ -94,7 +137,7 @@ const Profile = () => {
         <View style={styles.table}>
           <Table borderStyle={{ borderWidth: 1, borderColor: '#000' }}>
             <Row data={['Doctor', `${patient.doctorName}`]} style={styles.tableRow} textStyle={styles.tableText} />
-            <Row data={['Caregiver', `${patient.caretakerName}`]} style={styles.tableRow} textStyle={styles.tableText} />
+            <Row data={['Caregiver', `${patient.caretakerName || ''}`]} style={styles.tableRow} textStyle={styles.tableText} />
             <Row data={['Therapy', patient.therapy]} style={styles.tableRow} textStyle={styles.tableText} />
             <Row data={['Therapy Start Date', patient.therapy_start_date]} style={styles.tableRow} textStyle={styles.tableText} />
             <Row data={['Next Review Date', patient.next_review_date || 'Not Set']} style={styles.tableRow} textStyle={styles.tableText} />

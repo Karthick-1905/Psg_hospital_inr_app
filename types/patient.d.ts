@@ -31,7 +31,8 @@ export interface Patient{
   role: string;
   exp: number;
   caretakerName?: string | null,
-  doctorName : string
+  doctorName : string,
+  instructions ?: string
 }
 
 export interface DosageScheduleItem {
